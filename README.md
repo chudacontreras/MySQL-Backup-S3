@@ -501,4 +501,3 @@ Las contribuciones a este proyecto son bienvenidas. Al contribuir, aceptas que t
 
 Para preguntas sobre la licencia o el proyecto:
 - Proyecto: RDS Backup System
-- Repositorio: [(https://github.com/chudacontreras/MySQL-Backup-S3)] 
