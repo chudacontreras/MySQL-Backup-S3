@@ -446,4 +446,59 @@ Para problemas o preguntas:
 
 ## Licencia
 
-Uso interno - Aelis4 Project
+Este proyecto está licenciado bajo la **GNU General Public License v3.0 (GPL-3.0)**.
+
+### Resumen de la Licencia
+
+Eres libre de:
+- ✅ **Usar** el software para cualquier propósito (comercial o no comercial)
+- ✅ **Estudiar** cómo funciona el software y modificarlo
+- ✅ **Distribuir** copias del software original
+- ✅ **Distribuir** copias de tus versiones modificadas
+
+### Condiciones
+
+Bajo las siguientes condiciones:
+- 📋 **Copyleft:** Cualquier software derivado debe ser distribuido bajo la misma licencia GPL-3.0
+- 📦 **Código fuente:** Debes incluir el código fuente cuando distribuyas el software
+- 📝 **Documentar cambios:** Debes documentar claramente los cambios realizados
+- ©️ **Aviso de copyright:** Debes incluir el aviso de copyright y licencia original
+- 🔓 **Sin garantías:** El software se proporciona "tal cual", sin garantías de ningún tipo
+
+### Texto Completo de la Licencia
+
+```
+GNU GENERAL PUBLIC LICENSE
+Version 3, 29 June 2007
+
+Copyright (C) 2024 Aelis4 Project Contributors
+
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
+
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
+
+You should have received a copy of the GNU General Public License
+along with this program.  If not, see <https://www.gnu.org/licenses/>.
+```
+
+### Más Información
+
+Para el texto completo de la licencia GPL-3.0, visita:
+- 🌐 https://www.gnu.org/licenses/gpl-3.0.html
+- 📄 https://www.gnu.org/licenses/gpl-3.0.txt
+
+### Contribuciones
+
+Las contribuciones a este proyecto son bienvenidas. Al contribuir, aceptas que tus contribuciones serán licenciadas bajo la misma licencia GPL-3.0.
+
+### Contacto
+
+Para preguntas sobre la licencia o el proyecto:
+- Proyecto: RDS Backup System
+- Repositorio: [(https://github.com/chudacontreras/MySQL-Backup-S3)] 
