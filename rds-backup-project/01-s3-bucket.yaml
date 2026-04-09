@@ -1,0 +1,14 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: S3 Bucket para respaldos RDS
+
+Resources:
+  RDSBackupBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: rds-backup-bucket-aelis4-prod
+      VersioningConfiguration:
+        Status: Enabled
+
+Outputs:
+  BucketName:
+    Value: !Ref RDSBackupBucket

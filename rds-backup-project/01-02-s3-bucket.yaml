@@ -1,0 +1,27 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: S3 Bucket para respaldos RDS con ciclo de vida y nombre único
+
+Parameters:
+  Suffix:
+    Type: String
+    Description: Sufijo aleatorio para el bucket (ej. 0728abc9)
+
+Resources:
+  RDSBackupBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub "rds-backup-bucket-aelis4-${Suffix}"
+      VersioningConfiguration:
+        Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+          - Id: MoveToGlacierAfter30Days
+            Status: Enabled
+            Prefix: ""
+            Transitions:
+              - TransitionInDays: 30
+                StorageClass: GLACIER
+
+Outputs:
+  BucketName:
+    Value: !Ref RDSBackupBucket

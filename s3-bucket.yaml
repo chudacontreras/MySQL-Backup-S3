@@ -1,0 +1,91 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'S3 Bucket for RDS MySQL Backups'
+
+Parameters:
+  BucketName:
+    Type: String
+    Description: Name of the S3 bucket for backups
+    Default:     Default: aelis4-rds-backup-bucket-prod
+    AllowedPattern: '^[a-z0-9][a-z0-9-]*[a-z0-9]$'
+    ConstraintDescription: Bucket name must be lowercase, start and end with alphanumeric characters
+  
+  RetentionDays:
+    Type: Number
+    Description: Number of days to retain backups
+    Default: 30
+    MinValue: 1
+    MaxValue: 365
+
+Resources:
+  # S3 Bucket para almacenar los backups
+  BackupBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub '${BucketName}-${AWS::AccountId}-${AWS::Region}'
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteOldBackups
+            Status: Enabled
+            ExpirationInDays: !Ref RetentionDays
+            NoncurrentVersionExpirationInDays: 7
+          - Id: TransitionToIA
+            Status: Enabled
+            TransitionInDays: 7
+            StorageClass: STANDARD_INFREQUENT_ACCESS
+          - Id: TransitionToGlacier
+            Status: Enabled
+            TransitionInDays: 30
+            StorageClass: GLACIER
+      NotificationConfiguration:
+        CloudWatchConfigurations:
+          - Event: 's3:ObjectCreated:*'
+      Tags:
+        - Key: Purpose
+          Value: RDS-MySQL-Backups
+        - Key: Environment
+          Value: Production
+        - Key: AutomatedBackup
+          Value: 'true'
+
+  # CloudWatch Log Group para monitorear los backups
+  BackupLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: /aws/rds-backup/mysql
+      RetentionInDays: 14
+
+Outputs:
+  BucketName:
+    Description: Name of the S3 backup bucket
+    Value: !Ref BackupBucket
+    Export:
+      Name: !Sub '${AWS::StackName}-BucketName'
+  
+  BucketArn:
+    Description: ARN of the S3 backup bucket
+    Value: !GetAtt BackupBucket.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-BucketArn'
+  
+  BucketDomainName:
+    Description: Domain name of the S3 backup bucket
+    Value: !GetAtt BackupBucket.DomainName
+    Export:
+      Name: !Sub '${AWS::StackName}-BucketDomainName'
+  
+  LogGroupName:
+    Description: CloudWatch Log Group for backup monitoring
+    Value: !Ref BackupLogGroup
+    Export:
+      Name: !Sub '${AWS::StackName}-LogGroupName'

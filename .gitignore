@@ -1,0 +1,258 @@
+# ============================================
+# .gitignore para Proyecto de Backup RDS
+# ============================================
+
+# Archivo de auditoría de seguridad (contiene información sensible)
+SECURITY_AUDIT.md
+
+# ============================================
+# Archivos de Configuración con Datos Sensibles
+# ============================================
+
+# Archivos de parámetros con valores reales
+parameter.json.local
+parameter-*.json
+*-parameters.json
+*.params.json
+
+# Variables de entorno
+.env
+.env.local
+.env.*.local
+env_vars.sh.local
+*.env
+
+# Archivos de credenciales
+credentials.json
+secrets.json
+config.json.local
+*.credentials
+
+# Claves SSH
+*.pem
+*.key
+*.ppk
+id_rsa*
+id_ed25519*
+
+# ============================================
+# Archivos de AWS
+# ============================================
+
+# Credenciales de AWS
+.aws/
+aws-credentials
+credentials
+
+# Archivos de CloudFormation generados
+*.template.json
+*-stack-output.json
+stack-outputs/
+
+# ============================================
+# Logs y Archivos Temporales
+# ============================================
+
+# Logs
+*.log
+logs/
+*.log.*
+/var/log/
+
+# Archivos temporales
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Backups locales
+*.sql
+*.sql.gz
+*.dump
+*.backup
+backups/
+tmp/
+temp/
+
+# ============================================
+# Archivos de IDE y Editores
+# ============================================
+
+# Visual Studio Code
+.vscode/
+*.code-workspace
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+
+# Sublime Text
+*.sublime-project
+*.sublime-workspace
+
+# Vim
+[._]*.s[a-v][a-z]
+[._]*.sw[a-p]
+[._]s[a-rt-v][a-z]
+[._]ss[a-gi-z]
+[._]sw[a-p]
+
+# Emacs
+*~
+\#*\#
+/.emacs.desktop
+/.emacs.desktop.lock
+*.elc
+
+# ============================================
+# Sistema Operativo
+# ============================================
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.directory
+.Trash-*
+
+# ============================================
+# Terraform (si se usa)
+# ============================================
+
+# Terraform state files
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+.terraform/
+.terraform.lock.hcl
+terraform.tfvars
+*.auto.tfvars
+
+# ============================================
+# Python (si se usan scripts Python)
+# ============================================
+
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+ENV/
+*.egg-info/
+
+# ============================================
+# Node.js (si se usan herramientas Node)
+# ============================================
+
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+package-lock.json
+yarn.lock
+
+# ============================================
+# Archivos de Testing y Coverage
+# ============================================
+
+.coverage
+htmlcov/
+.pytest_cache/
+.tox/
+coverage.xml
+*.cover
+
+# ============================================
+# Archivos de Build y Distribución
+# ============================================
+
+dist/
+build/
+*.egg
+*.whl
+
+# ============================================
+# Archivos Específicos del Proyecto
+# ============================================
+
+# Archivos de configuración local
+*-local.yaml
+*-local.yml
+*-local.sh
+local-*
+
+# Archivos de prueba con datos reales
+test-with-real-data.*
+production-test.*
+
+# Outputs de CloudFormation
+cfn-outputs/
+stack-info/
+
+# Archivos de estado
+*.status
+*.state
+init_status.txt.local
+
+# ============================================
+# Archivos de Documentación Sensible
+# ============================================
+
+# Documentación con información de producción
+PRODUCTION_NOTES.md
+REAL_CONFIG.md
+INTERNAL_DOCS.md
+
+# Diagramas con información sensible
+*-production-diagram.*
+*-real-architecture.*
+
+# ============================================
+# Archivos Comprimidos (excepto releases)
+# ============================================
+
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.rar
+*.7z
+
+# ============================================
+# Certificados y Claves
+# ============================================
+
+*.crt
+*.cer
+*.der
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.truststore
+
+# ============================================
+# Notas y Recordatorios Personales
+# ============================================
+
+TODO.md
+NOTES.md
+PERSONAL_NOTES.md
+scratch.*

@@ -1,0 +1,84 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'IAM Roles and Policies for RDS Backup Solution'
+
+Parameters:
+  S3BucketName:
+    Type: String
+    Description: Name of the S3 bucket for backups
+    Default: aelis4-rds-backup-bucket-prod
+Resources:
+  # IAM Role para la instancia EC2
+  EC2BackupRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: EC2-RDS-Backup-Role
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore
+      Policies:
+        - PolicyName: RDSBackupPolicy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              # Permisos para describir instancias RDS
+              - Effect: Allow
+                Action:
+                  - rds:DescribeDBInstances
+                  - rds:DescribeDBClusters
+                  - rds:ListTagsForResource
+                Resource: '*'
+              # Permisos para acceder a S3
+              - Effect: Allow
+                Action:
+                  - s3:PutObject
+                  - s3:PutObjectAcl
+                  - s3:GetObject
+                  - s3:DeleteObject
+                Resource: 
+                  - !Sub 'arn:aws:s3:::${S3BucketName}/*'
+              - Effect: Allow
+                Action:
+                  - s3:ListBucket
+                Resource: 
+                  - !Sub 'arn:aws:s3:::${S3BucketName}'
+              # Permisos para CloudWatch Logs
+              - Effect: Allow
+                Action:
+                  - logs:CreateLogGroup
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                  - logs:DescribeLogStreams
+                Resource: '*'
+
+  # Instance Profile para asociar el role a la EC2
+  EC2BackupInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      InstanceProfileName: EC2-RDS-Backup-Profile
+      Roles:
+        - !Ref EC2BackupRole
+
+Outputs:
+  EC2BackupRoleArn:
+    Description: ARN of the EC2 Backup Role
+    Value: !GetAtt EC2BackupRole.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-EC2BackupRoleArn'
+  
+  EC2BackupInstanceProfileArn:
+    Description: ARN of the EC2 Instance Profile
+    Value: !GetAtt EC2BackupInstanceProfile.Arn
+    Export:
+      Name: !Sub '${AWS::StackName}-EC2BackupInstanceProfileArn'
+  
+  EC2BackupInstanceProfileName:
+    Description: Name of the EC2 Instance Profile
+    Value: !Ref EC2BackupInstanceProfile
+    Export:
+      Name: !Sub '${AWS::StackName}-EC2BackupInstanceProfileName'

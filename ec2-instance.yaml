@@ -1,0 +1,290 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'EC2 Instance for RDS MySQL Backup Automation'
+
+Parameters:
+  SubnetId:
+    Type: String
+    Description: Subnet ID where EC2 will be launched
+    Default: subnet-0a1b2c3d4e5f6g7h8
+  
+  InstanceType:
+    Type: String
+    Description: EC2 Instance Type
+    Default: t3.micro
+    AllowedValues:
+      - t3.micro
+      - t3.small
+      - t3.medium
+      - t2.micro
+      - t2.small
+  
+  KeyPairName:
+    Type: String
+    Description: EC2 Key Pair for SSH access (optional)
+    Default: ''
+  
+  IAMStackName:
+    Type: String
+    Description: Name of the IAM stack that created the roles
+    Default: iam-roles-stack
+  
+  S3StackName:
+    Type: String
+    Description: Name of the S3 stack that created the bucket
+    Default: s3-bucket-stack
+  
+  RDSEndpoint:
+    Type: String
+    Description: RDS MySQL endpoint
+    Default: mydb.cluster-abc123xyz.us-east-1.rds.amazonaws.com
+  
+  RDSUsername:
+    Type: String
+    Description: RDS MySQL username
+    Default: admin
+  
+  RDSPassword:
+    Type: String
+    Description: RDS MySQL password
+    NoEcho: true
+  
+  DatabaseName:
+    Type: String
+    Description: Database name to backup
+    Default: myapp
+
+Conditions:
+  HasKeyPair: !Not [!Equals [!Ref KeyPairName, '']]
+
+Resources:
+  # Security Group para la instancia EC2
+  EC2SecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security group for RDS backup EC2 instance
+      VpcId: vpc-0x1y2z3a4b5c6d7e8  # Reemplazar con tu VPC ID
+      SecurityGroupEgress:
+        - IpProtocol: -1
+          CidrIp: 0.0.0.0/0
+          Description: Allow all outbound traffic
+      Tags:
+        - Key: Name
+          Value: RDS-Backup-SG
+        - Key: Purpose
+          Value: RDS-Backup
+
+  # Instancia EC2 para realizar los backups
+  BackupInstance:
+    Type: AWS::EC2::Instance
+    Properties:
+      ImageId: !Sub '{{resolve:ssm:/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2}}'
+      InstanceType: !Ref InstanceType
+      SubnetId: !Ref SubnetId
+      SecurityGroupIds:
+        - !Ref EC2SecurityGroup
+      IamInstanceProfile: 
+        Fn::ImportValue: !Sub '${IAMStackName}-EC2BackupInstanceProfileName'
+      KeyName: !If [HasKeyPair, !Ref KeyPairName, !Ref 'AWS::NoValue']
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          
+          # Variables de configuración
+          export RDS_ENDPOINT="${RDSEndpoint}"
+          export RDS_USERNAME="${RDSUsername}"
+          export RDS_PASSWORD="${RDSPassword}"
+          export DATABASE_NAME="${DatabaseName}"
+          export S3_BUCKET="${S3StackName}"
+          export AWS_REGION="${AWS::Region}"
+          export LOG_GROUP="/aws/rds-backup/mysql"
+          
+          # Actualizar el sistema
+          yum update -y
+          
+          # Instalar dependencias
+          yum install -y mysql awscli cronie
+          
+          # Instalar CloudWatch agent
+          yum install -y amazon-cloudwatch-agent
+          
+          # Configurar timezone
+          timedatectl set-timezone America/New_York
+          
+          # Crear directorio para scripts
+          mkdir -p /opt/rds-backup
+          mkdir -p /var/log/rds-backup
+          
+          # Crear script de backup
+          cat > /opt/rds-backup/mysql_backup.sh << 'BACKUP_SCRIPT'
+          #!/bin/bash
+          
+          # Variables de configuración
+          RDS_ENDPOINT="${RDS_ENDPOINT}"
+          RDS_USERNAME="${RDS_USERNAME}"
+          RDS_PASSWORD="${RDS_PASSWORD}"
+          DATABASE_NAME="${DATABASE_NAME}"
+          S3_BUCKET_NAME=$(aws cloudformation describe-stacks --stack-name ${S3_BUCKET} --query 'Stacks[0].Outputs[?OutputKey==`BucketName`].OutputValue' --output text --region ${AWS_REGION})
+          
+          # Variables de backup
+          BACKUP_DATE=$(date +%Y%m%d_%H%M%S)
+          BACKUP_FILE="${DATABASE_NAME}_backup_${BACKUP_DATE}.sql"
+          BACKUP_PATH="/tmp/${BACKUP_FILE}"
+          LOG_FILE="/var/log/rds-backup/backup_${BACKUP_DATE}.log"
+          
+          # Función de logging
+          log_message() {
+              echo "$(date '+%Y-%m-%d %H:%M:%S') - $1" | tee -a ${LOG_FILE}
+              aws logs put-log-events --log-group-name ${LOG_GROUP} --log-stream-name $(hostname) --log-events timestamp=$(date +%s000),message="$1" --region ${AWS_REGION} 2>/dev/null || true
+          }
+          
+          # Iniciar backup
+          log_message "Iniciando backup de base de datos: ${DATABASE_NAME}"
+          
+          # Realizar dump de la base de datos
+          log_message "Ejecutando mysqldump..."
+          mysqldump -h ${RDS_ENDPOINT} -u ${RDS_USERNAME} -p${RDS_PASSWORD} \
+              --single-transaction \
+              --routines \
+              --triggers \
+              --events \
+              --hex-blob \
+              --quick \
+              --lock-tables=false \
+              ${DATABASE_NAME} > ${BACKUP_PATH}
+          
+          if [ $? -eq 0 ]; then
+              log_message "Mysqldump completado exitosamente"
+              
+              # Comprimir el archivo
+              log_message "Comprimiendo archivo de backup..."
+              gzip ${BACKUP_PATH}
+              BACKUP_PATH="${BACKUP_PATH}.gz"
+              BACKUP_FILE="${BACKUP_FILE}.gz"
+              
+              # Subir a S3
+              log_message "Subiendo backup a S3: s3://${S3_BUCKET_NAME}/mysql-backups/${BACKUP_FILE}"
+              aws s3 cp ${BACKUP_PATH} s3://${S3_BUCKET_NAME}/mysql-backups/${BACKUP_FILE} \
+                  --metadata "database=${DATABASE_NAME},backup-date=${BACKUP_DATE},instance=$(hostname)" \
+                  --region ${AWS_REGION}
+              
+              if [ $? -eq 0 ]; then
+                  log_message "Backup subido exitosamente a S3"
+                  
+                  # Limpiar archivo temporal
+                  rm -f ${BACKUP_PATH}
+                  log_message "Archivo temporal eliminado"
+                  
+                  # Verificar tamaño del archivo en S3
+                  S3_SIZE=$(aws s3api head-object --bucket ${S3_BUCKET_NAME} --key mysql-backups/${BACKUP_FILE} --query ContentLength --output text --region ${AWS_REGION})
+                  log_message "Tamaño del backup en S3: ${S3_SIZE} bytes"
+                  
+              else
+                  log_message "ERROR: Falló la subida a S3"
+                  exit 1
+              fi
+          else
+              log_message "ERROR: Falló el mysqldump"
+              exit 1
+          fi
+          
+          log_message "Backup completado exitosamente"
+          BACKUP_SCRIPT
+          
+          # Hacer ejecutable el script
+          chmod +x /opt/rds-backup/mysql_backup.sh
+          
+          # Crear script de configuración de variables de entorno para cron
+          cat > /opt/rds-backup/env_vars.sh << ENV_SCRIPT
+          export RDS_ENDPOINT="${RDSEndpoint}"
+          export RDS_USERNAME="${RDSUsername}"
+          export RDS_PASSWORD="${RDSPassword}"
+          export DATABASE_NAME="${DatabaseName}"
+          export S3_BUCKET="${S3StackName}"
+          export AWS_REGION="${AWS::Region}"
+          export LOG_GROUP="/aws/rds-backup/mysql"
+          export PATH=/usr/local/bin:/usr/bin:/bin
+          ENV_SCRIPT
+          
+          # Crear wrapper script para cron
+          cat > /opt/rds-backup/cron_backup.sh << 'CRON_SCRIPT'
+          #!/bin/bash
+          source /opt/rds-backup/env_vars.sh
+          /opt/rds-backup/mysql_backup.sh >> /var/log/rds-backup/cron.log 2>&1
+          CRON_SCRIPT
+          
+          chmod +x /opt/rds-backup/cron_backup.sh
+          
+          # Configurar cron job para viernes 4 de julio a las 6:00 AM
+          # Nota: Para 2025, el 4 de julio es viernes, así que configuramos para viernes en julio
+          echo "0 6 4 7 * /opt/rds-backup/cron_backup.sh" | crontab -
+          
+          # También agregar un cron job semanal para pruebas (todos los viernes a las 6 AM)
+          (crontab -l 2>/dev/null; echo "0 6 * * 5 /opt/rds-backup/cron_backup.sh") | crontab -
+          
+          # Iniciar y habilitar crond
+          systemctl start crond
+          systemctl enable crond
+          
+          # Crear log group si no existe
+          aws logs create-log-group --log-group-name ${LOG_GROUP} --region ${AWS_REGION} 2>/dev/null || true
+          aws logs create-log-stream --log-group-name ${LOG_GROUP} --log-stream-name $(hostname) --region ${AWS_REGION} 2>/dev/null || true
+          
+          # Instalar y configurar CloudWatch agent
+          cat > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json << 'CW_CONFIG'
+          {
+              "logs": {
+                  "logs_collected": {
+                      "files": {
+                          "collect_list": [
+                              {
+                                  "file_path": "/var/log/rds-backup/*.log",
+                                  "log_group_name": "/aws/rds-backup/mysql",
+                                  "log_stream_name": "{hostname}/backup-logs",
+                                  "timezone": "America/New_York"
+                              }
+                          ]
+                      }
+                  }
+              }
+          }
+          CW_CONFIG
+          
+          # Iniciar CloudWatch agent
+          /opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl \
+              -a fetch-config \
+              -m ec2 \
+              -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json \
+              -s
+          
+          # Crear archivo de estado
+          echo "RDS Backup Instance initialized successfully at $(date)" > /opt/rds-backup/init_status.txt
+          
+          # Ejecutar una prueba inicial (comentado para producción)
+          # /opt/rds-backup/mysql_backup.sh
+      
+      Tags:
+        - Key: Name
+          Value: RDS-MySQL-Backup-Instance
+        - Key: Purpose
+          Value: Automated-RDS-Backup
+        - Key: Environment
+          Value: Production
+
+Outputs:
+  InstanceId:
+    Description: Instance ID of the backup server
+    Value: !Ref BackupInstance
+    Export:
+      Name: !Sub '${AWS::StackName}-InstanceId'
+  
+  InstancePrivateIP:
+    Description: Private IP of the backup instance
+    Value: !GetAtt BackupInstance.PrivateIp
+    Export:
+      Name: !Sub '${AWS::StackName}-InstancePrivateIP'
+  
+  SecurityGroupId:
+    Description: Security Group ID
+    Value: !Ref EC2SecurityGroup
+    Export:
+      Name: !Sub '${AWS::StackName}-SecurityGroupId'
